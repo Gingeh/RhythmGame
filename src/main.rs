@@ -5,7 +5,7 @@ use bevy::{app::AppExit, prelude::*, window::close_on_esc};
 use iyes_loopless::prelude::*;
 // Heavy code reuse from https://github.com/IyesGames/iyes_loopless/blob/main/examples/menu.rs
 
-/// The game's state.. duh
+/// The game's states
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum GameState {
     StartMenu,
@@ -17,9 +17,11 @@ enum GameState {
 #[derive(Component)]
 struct StartMenu;
 
+/// Marker component for the start button
 #[derive(Component)]
 struct StartButton;
 
+/// Marker component for the exit button
 #[derive(Component)]
 struct ExitButton;
 
@@ -37,39 +39,59 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
+
+        // Set GameState::StartMenu as the default state
         .add_loopless_state(GameState::StartMenu)
+
+        // Register the FixedUpdate stage to run every 125ms
         .add_stage_before(
             CoreStage::Update,
             "FixedUpdate",
             FixedTimestepStage::from_stage(Duration::from_millis(125), fixedupdate),
         )
+
+        // Setup the start menu when GameState::StartMenu is entered
         .add_enter_system(GameState::StartMenu, setup_start_menu)
+
         .add_system_set(
             ConditionSet::new()
+                // While the start menu is visible..
                 .run_in_state(GameState::StartMenu)
+                // Quit the game if the player presses escape
                 .with_system(close_on_esc)
+                // Change the colour of the buttons when the player interacts with them
                 .with_system(button_visual_interact)
+                // Run the associated code when the buttons are clicked
                 .with_system(on_start_button.run_if(button_interact::<StartButton>))
                 .with_system(on_exit_button.run_if(button_interact::<ExitButton>))
                 .into(),
         )
+
+        // Despawn the entire start menu when it is exited
         .add_exit_system(GameState::StartMenu, despawn_with::<StartMenu>)
+
         .add_system_set(
             ConditionSet::new()
+                // While the game is running
                 .run_in_state(GameState::Playing)
+                // Exit to the menu when the player presses escape
                 .with_system(menu_on_esc)
                 .into(),
         )
+
+        // Spawn the camera (for the game and for the UI)
         .add_startup_system(setup_camera)
         .run();
 }
 
+/// Recursively despawns every entity with a given component
 fn despawn_with<T: Component>(mut commands: Commands, q: Query<Entity, With<T>>) {
     for e in q.iter() {
         commands.entity(e).despawn_recursive();
     }
 }
 
+/// Spawn a 2D camera
 fn setup_camera(mut commands: Commands) {
     commands.spawn_bundle(Camera2dBundle::default());
 }
@@ -141,6 +163,7 @@ fn setup_start_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
         .push_children(&[start_button, exit_button]);
 }
 
+/// Returns true if any buttons with the given component are being pressed
 fn button_interact<B: Component>(
     query: Query<&Interaction, (Changed<Interaction>, With<Button>, With<B>)>,
 ) -> bool {
@@ -153,6 +176,7 @@ fn button_interact<B: Component>(
     false
 }
 
+/// Sets the colour of every button based on player interaction
 fn button_visual_interact(
     mut query: Query<(&Interaction, &mut UiColor), (Changed<Interaction>, With<Button>)>,
 ) {
@@ -171,14 +195,17 @@ fn button_visual_interact(
     }
 }
 
+/// Starts the game
 fn on_start_button(mut commands: Commands) {
     commands.insert_resource(NextState(GameState::Playing))
 }
 
+/// Exits the game
 fn on_exit_button(mut exit_writer: EventWriter<AppExit>) {
     exit_writer.send(AppExit);
 }
 
+/// Exit to the start menu if the player pressed escape
 fn menu_on_esc(mut commands: Commands, input: Res<Input<KeyCode>>) {
     if input.just_pressed(KeyCode::Escape) {
         commands.insert_resource(NextState(GameState::StartMenu))
