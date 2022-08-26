@@ -6,3 +6,9 @@ edition = "2021"
 [dependencies]
 bevy = "0.8"
 iyes_loopless = "0.7"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
