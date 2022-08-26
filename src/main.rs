@@ -108,7 +108,7 @@ fn setup_start_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
     };
 
     let button_textstyle = TextStyle {
-        font: asset_server.load("comic.ttf"),
+        font: asset_server.load("fonts/comic.ttf"),
         font_size: 36.0,
         color: Color::BLACK,
     };
