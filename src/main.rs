@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bevy::{app::AppExit, prelude::*, window::close_on_esc};
+use bevy::{app::AppExit, prelude::*, window::close_on_esc, render::texture::ImageSettings};
 
 use iyes_loopless::prelude::*;
 // Heavy code reuse from https://github.com/IyesGames/iyes_loopless/blob/main/examples/menu.rs
@@ -16,6 +16,10 @@ enum GameState {
 /// Marker component for entities used in the start menu
 #[derive(Component)]
 struct StartMenu;
+
+/// Marker component for entities used in the game
+#[derive(Component)]
+struct Game;
 
 /// Marker component for the start button
 #[derive(Component)]
@@ -70,6 +74,9 @@ fn main() {
         // Despawn the entire start menu when it is exited
         .add_exit_system(GameState::StartMenu, despawn_with::<StartMenu>)
 
+        // Setup the game when GameState::Playing is entered
+        .add_enter_system(GameState::Playing, setup_game)
+
         .add_system_set(
             ConditionSet::new()
                 // While the game is running
@@ -78,6 +85,9 @@ fn main() {
                 .with_system(menu_on_esc)
                 .into(),
         )
+
+        // Despawn the entire game when it is exited
+        .add_exit_system(GameState::Playing, despawn_with::<Game>)
 
         // Spawn the camera (for the game and for the UI)
         .add_startup_system(setup_camera)
@@ -203,6 +213,33 @@ fn on_start_button(mut commands: Commands) {
 /// Exits the game
 fn on_exit_button(mut exit_writer: EventWriter<AppExit>) {
     exit_writer.send(AppExit);
+}
+
+/// Sets up the game
+fn setup_game(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn_bundle(SpriteBundle {
+        texture: asset_server.load("textures/crosshairs/crosshair_A.png"),
+        transform: Transform::from_xyz(-135.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
+        ..Default::default()
+    }).insert(Game);
+
+    commands.spawn_bundle(SpriteBundle {
+        texture: asset_server.load("textures/crosshairs/crosshair_B.png"),
+        transform: Transform::from_xyz(-45.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
+        ..Default::default()
+    }).insert(Game);
+
+    commands.spawn_bundle(SpriteBundle {
+        texture: asset_server.load("textures/crosshairs/crosshair_C.png"),
+        transform: Transform::from_xyz(45.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
+        ..Default::default()
+    }).insert(Game);
+
+    commands.spawn_bundle(SpriteBundle {
+        texture: asset_server.load("textures/crosshairs/crosshair_D.png"),
+        transform: Transform::from_xyz(135.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
+        ..Default::default()
+    }).insert(Game);
 }
 
 /// Exit to the start menu if the player pressed escape
