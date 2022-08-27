@@ -25,6 +25,10 @@ struct StartButton;
 #[derive(Component)]
 struct ExitButton;
 
+/// Component containing a button's previous interaction state
+#[derive(Component)]
+struct OldInteraction(Interaction);
+
 /// Where all the magic happens
 fn main() {
     // Stage for anything that runs on a fixed timestep (i.e. update functions)
@@ -142,6 +146,7 @@ fn setup_start_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
             });
         })
         .insert(StartButton)
+        .insert(OldInteraction(Interaction::None))
         .id();
 
     let exit_button = commands
@@ -156,6 +161,7 @@ fn setup_start_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
             });
         })
         .insert(ExitButton)
+        .insert(OldInteraction(Interaction::None))
         .id();
 
     commands
@@ -165,14 +171,17 @@ fn setup_start_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 /// Returns true if any buttons with the given component are being pressed
 fn button_interact<B: Component>(
-    query: Query<&Interaction, (Changed<Interaction>, With<Button>, With<B>)>,
+    mut interactions: Query<
+        (&Interaction, &mut OldInteraction),
+        (Changed<Interaction>, With<Button>, With<B>),
+    >,
 ) -> bool {
-    for interaction in &query {
-        if *interaction == Interaction::Clicked {
-            return true;
+    for (new_interaction, mut old_interaction) in &mut interactions {
+        if  *new_interaction == Interaction::Hovered && old_interaction.0 == Interaction::Clicked {
+            return true
         }
+        old_interaction.0 = *new_interaction;
     }
-
     false
 }
 
