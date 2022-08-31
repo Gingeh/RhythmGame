@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bevy::{app::AppExit, prelude::*, window::close_on_esc, render::texture::ImageSettings};
+use bevy::{app::AppExit, prelude::*, window::close_on_esc};
 
 use iyes_loopless::prelude::*;
 // Heavy code reuse from https://github.com/IyesGames/iyes_loopless/blob/main/examples/menu.rs
@@ -216,30 +216,54 @@ fn on_exit_button(mut exit_writer: EventWriter<AppExit>) {
 }
 
 /// Sets up the game
-fn setup_game(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn_bundle(SpriteBundle {
-        texture: asset_server.load("textures/crosshairs/crosshair_A.png"),
+fn setup_game(mut commands: Commands, asset_server: Res<AssetServer>, mut texture_atlases: ResMut<Assets<TextureAtlas>>) {
+    let texture_handle = asset_server.load("textures/crosshairs.png");
+    let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(64.0, 64.0), 4, 1);
+    let atlas_handle = texture_atlases.add(texture_atlas);
+
+    commands.spawn_bundle(SpriteSheetBundle {
         transform: Transform::from_xyz(-135.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
+        sprite: TextureAtlasSprite {
+            index: 0,
+            custom_size: Some(Vec2::splat(200.0)),
+            ..Default::default()
+        },
+        texture_atlas: atlas_handle.clone(),
         ..Default::default()
-    }).insert(Game);
+    });
 
-    commands.spawn_bundle(SpriteBundle {
-        texture: asset_server.load("textures/crosshairs/crosshair_B.png"),
+    commands.spawn_bundle(SpriteSheetBundle {
         transform: Transform::from_xyz(-45.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
+        sprite: TextureAtlasSprite {
+            index: 1,
+            custom_size: Some(Vec2::splat(200.0)),
+            ..Default::default()
+        },
+        texture_atlas: atlas_handle.clone(),
         ..Default::default()
-    }).insert(Game);
+    });
 
-    commands.spawn_bundle(SpriteBundle {
-        texture: asset_server.load("textures/crosshairs/crosshair_C.png"),
+    commands.spawn_bundle(SpriteSheetBundle {
         transform: Transform::from_xyz(45.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
+        sprite: TextureAtlasSprite {
+            index: 2,
+            custom_size: Some(Vec2::splat(200.0)),
+            ..Default::default()
+        },
+        texture_atlas: atlas_handle.clone(),
         ..Default::default()
-    }).insert(Game);
+    });
 
-    commands.spawn_bundle(SpriteBundle {
-        texture: asset_server.load("textures/crosshairs/crosshair_D.png"),
+    commands.spawn_bundle(SpriteSheetBundle {
         transform: Transform::from_xyz(135.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
+        sprite: TextureAtlasSprite {
+            index: 3,
+            custom_size: Some(Vec2::splat(200.0)),
+            ..Default::default()
+        },
+        texture_atlas: atlas_handle,
         ..Default::default()
-    }).insert(Game);
+    });
 }
 
 /// Exit to the start menu if the player pressed escape
