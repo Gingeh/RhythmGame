@@ -29,6 +29,12 @@ struct StartButton;
 #[derive(Component)]
 struct ExitButton;
 
+#[derive(Default)]
+struct TextureAtlasHandles {
+    crosshairs: Option<Handle<TextureAtlas>>,
+    targets: Option<Handle<TextureAtlas>>,
+}
+
 /// Where all the magic happens
 fn main() {
     // Stage for anything that runs on a fixed timestep (i.e. update functions)
@@ -91,6 +97,9 @@ fn main() {
 
         // Spawn the camera (for the game and for the UI)
         .add_startup_system(setup_camera)
+
+        .init_resource::<TextureAtlasHandles>()
+        .add_startup_system(load_textures)
         .run();
 }
 
@@ -104,6 +113,19 @@ fn despawn_with<T: Component>(mut commands: Commands, q: Query<Entity, With<T>>)
 /// Spawn a 2D camera
 fn setup_camera(mut commands: Commands) {
     commands.spawn_bundle(Camera2dBundle::default());
+}
+
+fn load_textures(asset_server: Res<AssetServer>, mut texture_atlases: ResMut<Assets<TextureAtlas>>, mut handles: ResMut<TextureAtlasHandles>) {
+    let crosshair_texture_handle = asset_server.load("textures/crosshairs.png");
+    let crosshair_texture_atlas = TextureAtlas::from_grid(crosshair_texture_handle, Vec2::new(64.0, 64.0), 4, 1);
+    let crosshair_atlas_handle = texture_atlases.add(crosshair_texture_atlas);
+    
+    let target_texture_handle = asset_server.load("textures/targets.png");
+    let target_texture_atlas = TextureAtlas::from_grid(target_texture_handle, Vec2::new(64.0, 64.0), 4, 1);
+    let target_atlas_handle = texture_atlases.add(target_texture_atlas);
+
+    handles.crosshairs = Some(crosshair_atlas_handle);
+    handles.targets = Some(target_atlas_handle);
 }
 
 /// Spawn the start menu ui
@@ -216,10 +238,8 @@ fn on_exit_button(mut exit_writer: EventWriter<AppExit>) {
 }
 
 /// Sets up the game
-fn setup_game(mut commands: Commands, asset_server: Res<AssetServer>, mut texture_atlases: ResMut<Assets<TextureAtlas>>) {
-    let texture_handle = asset_server.load("textures/crosshairs.png");
-    let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(64.0, 64.0), 4, 1);
-    let atlas_handle = texture_atlases.add(texture_atlas);
+fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
+    let atlas_handle = atlas_handles.crosshairs.as_ref().unwrap();
 
     commands.spawn_bundle(SpriteSheetBundle {
         transform: Transform::from_xyz(-135.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
@@ -261,7 +281,7 @@ fn setup_game(mut commands: Commands, asset_server: Res<AssetServer>, mut textur
             custom_size: Some(Vec2::splat(200.0)),
             ..Default::default()
         },
-        texture_atlas: atlas_handle,
+        texture_atlas: atlas_handle.clone(),
         ..Default::default()
     });
 }
