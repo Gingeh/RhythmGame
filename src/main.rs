@@ -3,6 +3,7 @@ use std::time::Duration;
 use bevy::{app::AppExit, prelude::*, window::close_on_esc};
 
 use iyes_loopless::prelude::*;
+use rand::Rng;
 // Heavy code reuse from https://github.com/IyesGames/iyes_loopless/blob/main/examples/menu.rs
 
 /// The game's states
@@ -29,17 +30,21 @@ struct StartButton;
 #[derive(Component)]
 struct ExitButton;
 
+#[derive(Component)]
+struct Target;
+
 #[derive(Default)]
 struct TextureAtlasHandles {
     crosshairs: Option<Handle<TextureAtlas>>,
     targets: Option<Handle<TextureAtlas>>,
 }
 
+struct TargetHitEvent;
+
+struct TargetMissEvent;
+
 /// Where all the magic happens
 fn main() {
-    // Stage for anything that runs on a fixed timestep (i.e. update functions)
-    let mut fixedupdate = SystemStage::parallel();
-
     App::new()
         .insert_resource(WindowDescriptor {
             title: "Rhythm Game".into(),
@@ -50,15 +55,11 @@ fn main() {
         })
         .add_plugins(DefaultPlugins)
 
+        .add_event::<TargetHitEvent>()
+        .add_event::<TargetMissEvent>()
+
         // Set GameState::StartMenu as the default state
         .add_loopless_state(GameState::StartMenu)
-
-        // Register the FixedUpdate stage to run every 125ms
-        .add_stage_before(
-            CoreStage::Update,
-            "FixedUpdate",
-            FixedTimestepStage::from_stage(Duration::from_millis(125), fixedupdate),
-        )
 
         // Setup the start menu when GameState::StartMenu is entered
         .add_enter_system(GameState::StartMenu, setup_start_menu)
@@ -89,7 +90,14 @@ fn main() {
                 .run_in_state(GameState::Playing)
                 // Exit to the menu when the player presses escape
                 .with_system(menu_on_esc)
+                .with_system(update_targets)
                 .into(),
+        )
+        .add_stage_before(
+            CoreStage::Update, 
+            "SpawnTargets", 
+            FixedTimestepStage::new(Duration::from_millis(250))
+                .with_stage(SystemStage::single(spawn_targets.run_in_state(GameState::Playing)))
         )
 
         // Despawn the entire game when it is exited
@@ -290,5 +298,43 @@ fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
 fn menu_on_esc(mut commands: Commands, input: Res<Input<KeyCode>>) {
     if input.just_pressed(KeyCode::Escape) {
         commands.insert_resource(NextState(GameState::StartMenu))
+    }
+}
+
+fn spawn_targets(commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
+    let mut rng = rand::thread_rng();
+    let column = rng.gen_range(0..4);
+
+    spawn_target(column, commands, atlas_handles);
+}
+
+fn spawn_target(column: usize, mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
+    let atlas_handle = atlas_handles.targets.as_ref().unwrap();
+
+    commands.spawn_bundle(SpriteSheetBundle {
+        transform: Transform::from_xyz((column as f32) * 90.0 - 135.0, 400.0, 0.0).with_scale(Vec3::splat(0.3)),
+        sprite: TextureAtlasSprite {
+            index: column,
+            custom_size: Some(Vec2::splat(200.0)),
+            ..Default::default()
+        },
+        texture_atlas: atlas_handle.clone(),
+        ..Default::default()
+    }).insert(Game).insert(Target);
+}
+
+fn update_targets(
+    mut commands: Commands, 
+    mut targets: Query<(Entity, &mut Transform), With<Target>>, 
+    time: Res<Time>,
+    mut miss_event_writer: EventWriter<TargetMissEvent>,
+) {
+    for (target, mut transform) in targets.iter_mut() {
+        if transform.translation.y < -350.0 {
+            commands.entity(target).despawn();
+            miss_event_writer.send(TargetMissEvent);
+        } else {
+            transform.translation.y -= 200.0 * time.delta_seconds();
+        }
     }
 }
