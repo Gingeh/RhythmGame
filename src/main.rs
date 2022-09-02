@@ -250,7 +250,7 @@ fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
         },
         texture_atlas: atlas_handle.clone(),
         ..Default::default()
-    });
+    }).insert(Game);
 
     commands.spawn_bundle(SpriteSheetBundle {
         transform: Transform::from_xyz(-45.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
@@ -261,7 +261,7 @@ fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
         },
         texture_atlas: atlas_handle.clone(),
         ..Default::default()
-    });
+    }).insert(Game);
 
     commands.spawn_bundle(SpriteSheetBundle {
         transform: Transform::from_xyz(45.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
@@ -272,7 +272,7 @@ fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
         },
         texture_atlas: atlas_handle.clone(),
         ..Default::default()
-    });
+    }).insert(Game);
 
     commands.spawn_bundle(SpriteSheetBundle {
         transform: Transform::from_xyz(135.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
@@ -283,7 +283,7 @@ fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
         },
         texture_atlas: atlas_handle.clone(),
         ..Default::default()
-    });
+    }).insert(Game);
 }
 
 /// Exit to the start menu if the player pressed escape
