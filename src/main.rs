@@ -3,6 +3,7 @@ use std::time::Duration;
 use bevy::{app::AppExit, prelude::*, window::close_on_esc};
 
 use iyes_loopless::prelude::*;
+use rand::{Rng, distributions::{Standard,Distribution}};
 // Heavy code reuse from https://github.com/IyesGames/iyes_loopless/blob/main/examples/menu.rs
 
 /// The game's states
@@ -17,6 +18,10 @@ enum GameState {
 #[derive(Component)]
 struct StartMenu;
 
+/// Marker component for entities used in the game
+#[derive(Component)]
+struct Game;
+
 /// Marker component for the start button
 #[derive(Component)]
 struct StartButton;
@@ -29,11 +34,51 @@ struct ExitButton;
 #[derive(Component)]
 struct OldInteraction(Interaction);
 
+#[derive(Component)]
+struct Target;
+
+#[derive(Component, PartialEq, Eq)]
+enum Column {
+  Yellow,
+  Red,
+  Blue,
+  Green,
+}
+
+impl Column {
+    fn index(&self) -> usize {
+        match self {
+            Column::Yellow => 0,
+            Column::Red => 1,
+            Column::Blue => 2,
+            Column::Green => 3,
+        }
+    }
+}
+
+impl Distribution<Column> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Column {
+        match rng.gen_range(0..4) {
+            0 => Column::Yellow,
+            1 => Column::Red,
+            2 => Column::Blue,
+            _ => Column::Green,
+        }
+    }
+}
+
+#[derive(Default)]
+struct TextureAtlasHandles {
+    crosshairs: Option<Handle<TextureAtlas>>,
+    targets: Option<Handle<TextureAtlas>>,
+}
+
+struct TargetHitEvent;
+
+struct TargetMissEvent;
+
 /// Where all the magic happens
 fn main() {
-    // Stage for anything that runs on a fixed timestep (i.e. update functions)
-    let mut fixedupdate = SystemStage::parallel();
-
     App::new()
         .insert_resource(WindowDescriptor {
             title: "Rhythm Game".into(),
@@ -44,15 +89,11 @@ fn main() {
         })
         .add_plugins(DefaultPlugins)
 
+        .add_event::<TargetHitEvent>()
+        .add_event::<TargetMissEvent>()
+
         // Set GameState::StartMenu as the default state
         .add_loopless_state(GameState::StartMenu)
-
-        // Register the FixedUpdate stage to run every 125ms
-        .add_stage_before(
-            CoreStage::Update,
-            "FixedUpdate",
-            FixedTimestepStage::from_stage(Duration::from_millis(125), fixedupdate),
-        )
 
         // Setup the start menu when GameState::StartMenu is entered
         .add_enter_system(GameState::StartMenu, setup_start_menu)
@@ -74,17 +115,34 @@ fn main() {
         // Despawn the entire start menu when it is exited
         .add_exit_system(GameState::StartMenu, despawn_with::<StartMenu>)
 
+        // Setup the game when GameState::Playing is entered
+        .add_enter_system(GameState::Playing, setup_game)
+
         .add_system_set(
             ConditionSet::new()
                 // While the game is running
                 .run_in_state(GameState::Playing)
                 // Exit to the menu when the player presses escape
                 .with_system(menu_on_esc)
+                .with_system(update_targets)
+                .with_system(shoot_targets)
                 .into(),
         )
+        .add_stage_before(
+            CoreStage::Update,
+            "SpawnTargets",
+            FixedTimestepStage::new(Duration::from_millis(250))
+                .with_stage(SystemStage::single(spawn_targets.run_in_state(GameState::Playing)))
+        )
+
+        // Despawn the entire game when it is exited
+        .add_exit_system(GameState::Playing, despawn_with::<Game>)
 
         // Spawn the camera (for the game and for the UI)
         .add_startup_system(setup_camera)
+
+        .init_resource::<TextureAtlasHandles>()
+        .add_startup_system(load_textures)
         .run();
 }
 
@@ -98,6 +156,19 @@ fn despawn_with<T: Component>(mut commands: Commands, q: Query<Entity, With<T>>)
 /// Spawn a 2D camera
 fn setup_camera(mut commands: Commands) {
     commands.spawn_bundle(Camera2dBundle::default());
+}
+
+fn load_textures(asset_server: Res<AssetServer>, mut texture_atlases: ResMut<Assets<TextureAtlas>>, mut handles: ResMut<TextureAtlasHandles>) {
+    let crosshair_texture_handle = asset_server.load("textures/crosshairs.png");
+    let crosshair_texture_atlas = TextureAtlas::from_grid(crosshair_texture_handle, Vec2::new(64.0, 64.0), 4, 1);
+    let crosshair_atlas_handle = texture_atlases.add(crosshair_texture_atlas);
+
+    let target_texture_handle = asset_server.load("textures/targets.png");
+    let target_texture_atlas = TextureAtlas::from_grid(target_texture_handle, Vec2::new(64.0, 64.0), 4, 1);
+    let target_atlas_handle = texture_atlases.add(target_texture_atlas);
+
+    handles.crosshairs = Some(crosshair_atlas_handle);
+    handles.targets = Some(target_atlas_handle);
 }
 
 /// Spawn the start menu ui
@@ -214,9 +285,118 @@ fn on_exit_button(mut exit_writer: EventWriter<AppExit>) {
     exit_writer.send(AppExit);
 }
 
+/// Sets up the game
+fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
+    let atlas_handle = atlas_handles.crosshairs.as_ref().unwrap();
+
+    for column in [Column::Yellow, Column::Red, Column::Blue, Column::Green] {
+        commands.spawn_bundle(SpriteSheetBundle {
+        transform: Transform::from_xyz((column.index() as f32) * 90.0 - 135.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
+        sprite: TextureAtlasSprite {
+            index: column.index(),
+            custom_size: Some(Vec2::splat(200.0)),
+            ..Default::default()
+        },
+        texture_atlas: atlas_handle.clone(),
+        ..Default::default()
+    }).insert(Game).insert(column);
+    }
+}
+
 /// Exit to the start menu if the player pressed escape
 fn menu_on_esc(mut commands: Commands, input: Res<Input<KeyCode>>) {
     if input.just_pressed(KeyCode::Escape) {
         commands.insert_resource(NextState(GameState::StartMenu))
     }
+}
+
+fn spawn_targets(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
+    let mut rng = rand::thread_rng();
+    let column = rng.gen::<Column>();
+
+    let atlas_handle = atlas_handles.targets.as_ref().unwrap();
+
+    commands.spawn_bundle(SpriteSheetBundle {
+        transform: Transform::from_xyz((column.index() as f32) * 90.0 - 135.0, 400.0, 0.0).with_scale(Vec3::splat(0.3)),
+        sprite: TextureAtlasSprite {
+            index: column.index(),
+            custom_size: Some(Vec2::splat(200.0)),
+            ..Default::default()
+        },
+        texture_atlas: atlas_handle.clone(),
+        ..Default::default()
+    }).insert(Game).insert(Target).insert(column);
+}
+
+fn update_targets(
+    mut commands: Commands,
+    mut targets: Query<(Entity, &mut Transform), With<Target>>,
+    time: Res<Time>,
+    mut miss_event_writer: EventWriter<TargetMissEvent>,
+) {
+    for (target, mut transform) in targets.iter_mut() {
+        if transform.translation.y < -350.0 {
+            commands.entity(target).despawn();
+            miss_event_writer.send(TargetMissEvent);
+        } else {
+            transform.translation.y -= 200.0 * time.delta_seconds();
+        }
+    }
+}
+
+fn shoot_targets(
+    mut commands: Commands,
+    targets: Query<(Entity, &Transform, &Column), With<Target>>,
+    input: Res<Input<KeyCode>>,
+    mut hit_event_writer: EventWriter<TargetHitEvent>,
+) {
+    if input.any_just_pressed([KeyCode::A, KeyCode::H]) {
+        targets
+            .iter()
+            .filter(|(_, transform, column)| {
+                *column == &Column::Yellow && transform.translation.y <= -280.0
+            })
+            .for_each(|(target, _, _)| {
+                commands.entity(target).despawn();
+                hit_event_writer.send(TargetHitEvent);
+            });
+    }
+
+    if input.any_just_pressed([KeyCode::S, KeyCode::J]) {
+        targets
+            .iter()
+            .filter(|(_, transform, column)| {
+                *column == &Column::Red && transform.translation.y <= -280.0
+            })
+            .for_each(|(target, _, _)| {
+                commands.entity(target).despawn();
+                hit_event_writer.send(TargetHitEvent);
+            });
+    }
+
+    if input.any_just_pressed([KeyCode::D, KeyCode::K]) {
+        targets
+            .iter()
+            .filter(|(_, transform, column)| {
+                *column == &Column::Blue && transform.translation.y <= -280.0
+            })
+            .for_each(|(target, _, _)| {
+                commands.entity(target).despawn();
+                hit_event_writer.send(TargetHitEvent);
+            });
+    }
+
+    if input.any_just_pressed([KeyCode::F, KeyCode::L]) {
+        targets
+            .iter()
+            .filter(|(_, transform, column)| {
+                *column == &Column::Green && transform.translation.y <= -280.0
+            })
+            .for_each(|(target, _, _)| {
+                commands.entity(target).despawn();
+                hit_event_writer.send(TargetHitEvent);
+            });
+    }
+
+    //FIXME: Holy code duplication, Batman!
 }
