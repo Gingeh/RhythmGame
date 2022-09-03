@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::{app::AppExit, prelude::*, window::close_on_esc};
 
 use iyes_loopless::prelude::*;
-use rand::Rng;
+use rand::{Rng, distributions::{Standard,Distribution}};
 // Heavy code reuse from https://github.com/IyesGames/iyes_loopless/blob/main/examples/menu.rs
 
 /// The game's states
@@ -32,6 +32,36 @@ struct ExitButton;
 
 #[derive(Component)]
 struct Target;
+
+#[derive(Component)]
+enum Column {
+  Yellow,
+  Red,
+  Blue,
+  Green,
+}
+
+impl Column {
+    fn index(&self) -> usize {
+        match self {
+            Column::Yellow => 0,
+            Column::Red => 1,
+            Column::Blue => 2,
+            Column::Green => 3,
+        }
+    }
+}
+
+impl Distribution<Column> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Column {
+        match rng.gen_range(0..4) {
+            0 => Column::Yellow,
+            1 => Column::Red,
+            2 => Column::Blue,
+            _ => Column::Green,
+        }
+    }
+}
 
 #[derive(Default)]
 struct TextureAtlasHandles {
@@ -249,49 +279,18 @@ fn on_exit_button(mut exit_writer: EventWriter<AppExit>) {
 fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
     let atlas_handle = atlas_handles.crosshairs.as_ref().unwrap();
 
-    commands.spawn_bundle(SpriteSheetBundle {
-        transform: Transform::from_xyz(-135.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
+    for column in [Column::Yellow, Column::Red, Column::Blue, Column::Green] {
+        commands.spawn_bundle(SpriteSheetBundle {
+        transform: Transform::from_xyz((column.index() as f32) * 90.0 - 135.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
         sprite: TextureAtlasSprite {
-            index: 0,
+            index: column.index(),
             custom_size: Some(Vec2::splat(200.0)),
             ..Default::default()
         },
         texture_atlas: atlas_handle.clone(),
         ..Default::default()
-    }).insert(Game);
-
-    commands.spawn_bundle(SpriteSheetBundle {
-        transform: Transform::from_xyz(-45.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
-        sprite: TextureAtlasSprite {
-            index: 1,
-            custom_size: Some(Vec2::splat(200.0)),
-            ..Default::default()
-        },
-        texture_atlas: atlas_handle.clone(),
-        ..Default::default()
-    }).insert(Game);
-
-    commands.spawn_bundle(SpriteSheetBundle {
-        transform: Transform::from_xyz(45.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
-        sprite: TextureAtlasSprite {
-            index: 2,
-            custom_size: Some(Vec2::splat(200.0)),
-            ..Default::default()
-        },
-        texture_atlas: atlas_handle.clone(),
-        ..Default::default()
-    }).insert(Game);
-
-    commands.spawn_bundle(SpriteSheetBundle {
-        transform: Transform::from_xyz(135.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
-        sprite: TextureAtlasSprite {
-            index: 3,
-            custom_size: Some(Vec2::splat(200.0)),
-            ..Default::default()
-        },
-        texture_atlas: atlas_handle.clone(),
-        ..Default::default()
-    }).insert(Game);
+    }).insert(Game).insert(column);
+    }
 }
 
 /// Exit to the start menu if the player pressed escape
@@ -301,26 +300,22 @@ fn menu_on_esc(mut commands: Commands, input: Res<Input<KeyCode>>) {
     }
 }
 
-fn spawn_targets(commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
+fn spawn_targets(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
     let mut rng = rand::thread_rng();
-    let column = rng.gen_range(0..4);
+    let column = rng.gen::<Column>();
 
-    spawn_target(column, commands, atlas_handles);
-}
-
-fn spawn_target(column: usize, mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
     let atlas_handle = atlas_handles.targets.as_ref().unwrap();
 
     commands.spawn_bundle(SpriteSheetBundle {
-        transform: Transform::from_xyz((column as f32) * 90.0 - 135.0, 400.0, 0.0).with_scale(Vec3::splat(0.3)),
+        transform: Transform::from_xyz((column.index() as f32) * 90.0 - 135.0, 400.0, 0.0).with_scale(Vec3::splat(0.3)),
         sprite: TextureAtlasSprite {
-            index: column,
+            index: column.index(),
             custom_size: Some(Vec2::splat(200.0)),
             ..Default::default()
         },
         texture_atlas: atlas_handle.clone(),
         ..Default::default()
-    }).insert(Game).insert(Target);
+    }).insert(Game).insert(Target).insert(column);
 }
 
 fn update_targets(
