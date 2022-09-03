@@ -33,7 +33,7 @@ struct ExitButton;
 #[derive(Component)]
 struct Target;
 
-#[derive(Component)]
+#[derive(Component, PartialEq, Eq)]
 enum Column {
   Yellow,
   Red,
@@ -121,6 +121,7 @@ fn main() {
                 // Exit to the menu when the player presses escape
                 .with_system(menu_on_esc)
                 .with_system(update_targets)
+                .with_system(shoot_targets)
                 .into(),
         )
         .add_stage_before(
@@ -332,4 +333,61 @@ fn update_targets(
             transform.translation.y -= 200.0 * time.delta_seconds();
         }
     }
+}
+
+fn shoot_targets(
+    mut commands: Commands,
+    targets: Query<(Entity, &Transform, &Column), With<Target>>,
+    input: Res<Input<KeyCode>>,
+    mut hit_event_writer: EventWriter<TargetHitEvent>,
+) {
+    if input.any_just_pressed([KeyCode::A, KeyCode::H]) {
+        targets
+            .iter()
+            .filter(|(_, transform, column)| {
+                *column == &Column::Yellow && transform.translation.y <= -280.0
+            })
+            .for_each(|(target, _, _)| {
+                commands.entity(target).despawn();
+                hit_event_writer.send(TargetHitEvent);
+            });
+    }
+
+    if input.any_just_pressed([KeyCode::S, KeyCode::J]) {
+        targets
+            .iter()
+            .filter(|(_, transform, column)| {
+                *column == &Column::Red && transform.translation.y <= -280.0
+            })
+            .for_each(|(target, _, _)| {
+                commands.entity(target).despawn();
+                hit_event_writer.send(TargetHitEvent);
+            });
+    }
+
+    if input.any_just_pressed([KeyCode::D, KeyCode::K]) {
+        targets
+            .iter()
+            .filter(|(_, transform, column)| {
+                *column == &Column::Blue && transform.translation.y <= -280.0
+            })
+            .for_each(|(target, _, _)| {
+                commands.entity(target).despawn();
+                hit_event_writer.send(TargetHitEvent);
+            });
+    }
+
+    if input.any_just_pressed([KeyCode::F, KeyCode::L]) {
+        targets
+            .iter()
+            .filter(|(_, transform, column)| {
+                *column == &Column::Green && transform.translation.y <= -280.0
+            })
+            .for_each(|(target, _, _)| {
+                commands.entity(target).despawn();
+                hit_event_writer.send(TargetHitEvent);
+            });
+    }
+
+    //FIXME: Holy code duplication, Batman!
 }
