@@ -3,7 +3,10 @@ use std::time::Duration;
 use bevy::{app::AppExit, prelude::*, window::close_on_esc};
 
 use iyes_loopless::prelude::*;
-use rand::{Rng, distributions::{Standard,Distribution}};
+use rand::{
+    distributions::{Distribution, Standard},
+    Rng,
+};
 // Heavy code reuse from https://github.com/IyesGames/iyes_loopless/blob/main/examples/menu.rs
 
 /// The game's states
@@ -39,10 +42,10 @@ struct Target;
 
 #[derive(Component, PartialEq, Eq)]
 enum Column {
-  Yellow,
-  Red,
-  Blue,
-  Green,
+    Yellow,
+    Red,
+    Blue,
+    Green,
 }
 
 impl Column {
@@ -88,16 +91,12 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
-
         .add_event::<TargetHitEvent>()
         .add_event::<TargetMissEvent>()
-
         // Set GameState::StartMenu as the default state
         .add_loopless_state(GameState::StartMenu)
-
         // Setup the start menu when GameState::StartMenu is entered
         .add_enter_system(GameState::StartMenu, setup_start_menu)
-
         .add_system_set(
             ConditionSet::new()
                 // While the start menu is visible..
@@ -111,13 +110,10 @@ fn main() {
                 .with_system(on_exit_button.run_if(button_interact::<ExitButton>))
                 .into(),
         )
-
         // Despawn the entire start menu when it is exited
         .add_exit_system(GameState::StartMenu, despawn_with::<StartMenu>)
-
         // Setup the game when GameState::Playing is entered
         .add_enter_system(GameState::Playing, setup_game)
-
         .add_system_set(
             ConditionSet::new()
                 // While the game is running
@@ -131,16 +127,14 @@ fn main() {
         .add_stage_before(
             CoreStage::Update,
             "SpawnTargets",
-            FixedTimestepStage::new(Duration::from_millis(250))
-                .with_stage(SystemStage::single(spawn_targets.run_in_state(GameState::Playing)))
+            FixedTimestepStage::new(Duration::from_millis(250)).with_stage(SystemStage::single(
+                spawn_targets.run_in_state(GameState::Playing),
+            )),
         )
-
         // Despawn the entire game when it is exited
         .add_exit_system(GameState::Playing, despawn_with::<Game>)
-
         // Spawn the camera (for the game and for the UI)
         .add_startup_system(setup_camera)
-
         .init_resource::<TextureAtlasHandles>()
         .add_startup_system(load_textures)
         .run();
@@ -158,13 +152,19 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn_bundle(Camera2dBundle::default());
 }
 
-fn load_textures(asset_server: Res<AssetServer>, mut texture_atlases: ResMut<Assets<TextureAtlas>>, mut handles: ResMut<TextureAtlasHandles>) {
+fn load_textures(
+    asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut handles: ResMut<TextureAtlasHandles>,
+) {
     let crosshair_texture_handle = asset_server.load("textures/crosshairs.png");
-    let crosshair_texture_atlas = TextureAtlas::from_grid(crosshair_texture_handle, Vec2::new(64.0, 64.0), 4, 1);
+    let crosshair_texture_atlas =
+        TextureAtlas::from_grid(crosshair_texture_handle, Vec2::new(64.0, 64.0), 4, 1);
     let crosshair_atlas_handle = texture_atlases.add(crosshair_texture_atlas);
 
     let target_texture_handle = asset_server.load("textures/targets.png");
-    let target_texture_atlas = TextureAtlas::from_grid(target_texture_handle, Vec2::new(64.0, 64.0), 4, 1);
+    let target_texture_atlas =
+        TextureAtlas::from_grid(target_texture_handle, Vec2::new(64.0, 64.0), 4, 1);
     let target_atlas_handle = texture_atlases.add(target_texture_atlas);
 
     handles.crosshairs = Some(crosshair_atlas_handle);
@@ -248,8 +248,8 @@ fn button_interact<B: Component>(
     >,
 ) -> bool {
     for (new_interaction, mut old_interaction) in &mut interactions {
-        if  *new_interaction == Interaction::Hovered && old_interaction.0 == Interaction::Clicked {
-            return true
+        if *new_interaction == Interaction::Hovered && old_interaction.0 == Interaction::Clicked {
+            return true;
         }
         old_interaction.0 = *new_interaction;
     }
@@ -290,16 +290,20 @@ fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
     let atlas_handle = atlas_handles.crosshairs.as_ref().unwrap();
 
     for column in [Column::Yellow, Column::Red, Column::Blue, Column::Green] {
-        commands.spawn_bundle(SpriteSheetBundle {
-        transform: Transform::from_xyz((column.index() as f32) * 90.0 - 135.0, -305.0, 0.0).with_scale(Vec3::splat(0.3)),
-        sprite: TextureAtlasSprite {
-            index: column.index(),
-            custom_size: Some(Vec2::splat(200.0)),
-            ..Default::default()
-        },
-        texture_atlas: atlas_handle.clone(),
-        ..Default::default()
-    }).insert(Game).insert(column);
+        commands
+            .spawn_bundle(SpriteSheetBundle {
+                transform: Transform::from_xyz((column.index() as f32) * 90.0 - 135.0, -305.0, 0.0)
+                    .with_scale(Vec3::splat(0.3)),
+                sprite: TextureAtlasSprite {
+                    index: column.index(),
+                    custom_size: Some(Vec2::splat(200.0)),
+                    ..Default::default()
+                },
+                texture_atlas: atlas_handle.clone(),
+                ..Default::default()
+            })
+            .insert(Game)
+            .insert(column);
     }
 }
 
@@ -316,16 +320,21 @@ fn spawn_targets(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>
 
     let atlas_handle = atlas_handles.targets.as_ref().unwrap();
 
-    commands.spawn_bundle(SpriteSheetBundle {
-        transform: Transform::from_xyz((column.index() as f32) * 90.0 - 135.0, 400.0, 0.0).with_scale(Vec3::splat(0.3)),
-        sprite: TextureAtlasSprite {
-            index: column.index(),
-            custom_size: Some(Vec2::splat(200.0)),
+    commands
+        .spawn_bundle(SpriteSheetBundle {
+            transform: Transform::from_xyz((column.index() as f32) * 90.0 - 135.0, 400.0, 0.0)
+                .with_scale(Vec3::splat(0.3)),
+            sprite: TextureAtlasSprite {
+                index: column.index(),
+                custom_size: Some(Vec2::splat(200.0)),
+                ..Default::default()
+            },
+            texture_atlas: atlas_handle.clone(),
             ..Default::default()
-        },
-        texture_atlas: atlas_handle.clone(),
-        ..Default::default()
-    }).insert(Game).insert(Target).insert(column);
+        })
+        .insert(Game)
+        .insert(Target)
+        .insert(column);
 }
 
 fn update_targets(
