@@ -90,6 +90,7 @@ fn main() {
             resizable: false,
             ..Default::default()
         })
+        .insert_resource(ClearColor(Color::BLACK))
         .add_plugins(DefaultPlugins)
         .add_event::<TargetHitEvent>()
         .add_event::<TargetMissEvent>()
