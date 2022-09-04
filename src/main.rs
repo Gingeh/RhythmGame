@@ -40,7 +40,7 @@ struct OldInteraction(Interaction);
 #[derive(Component)]
 struct Target;
 
-#[derive(Component, PartialEq, Eq)]
+#[derive(Component, PartialEq, Eq, Clone, Copy)]
 enum Column {
     Yellow,
     Red,
@@ -76,9 +76,17 @@ struct TextureAtlasHandles {
     targets: Option<Handle<TextureAtlas>>,
 }
 
-struct TargetHitEvent;
+#[derive(Default)]
+struct NoteAudioHandles {
+    yellow: Option<Handle<AudioSource>>,
+    red: Option<Handle<AudioSource>>,
+    blue: Option<Handle<AudioSource>>,
+    green: Option<Handle<AudioSource>>,
+}
 
-struct TargetMissEvent;
+struct TargetHitEvent(Column);
+
+struct TargetMissEvent(Column);
 
 /// Where all the magic happens
 fn main() {
@@ -123,6 +131,7 @@ fn main() {
                 .with_system(menu_on_esc)
                 .with_system(update_targets)
                 .with_system(shoot_targets)
+                .with_system(play_hit_sound)
                 .into(),
         )
         .add_stage_before(
@@ -137,7 +146,8 @@ fn main() {
         // Spawn the camera (for the game and for the UI)
         .add_startup_system(setup_camera)
         .init_resource::<TextureAtlasHandles>()
-        .add_startup_system(load_textures)
+        .init_resource::<NoteAudioHandles>()
+        .add_startup_system(load_assets)
         .run();
 }
 
@@ -153,10 +163,11 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn_bundle(Camera2dBundle::default());
 }
 
-fn load_textures(
+fn load_assets(
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-    mut handles: ResMut<TextureAtlasHandles>,
+    mut atlas_handles: ResMut<TextureAtlasHandles>,
+    mut audio_handles: ResMut<NoteAudioHandles>,
 ) {
     let crosshair_texture_handle = asset_server.load("textures/crosshairs.png");
     let crosshair_texture_atlas =
@@ -168,8 +179,13 @@ fn load_textures(
         TextureAtlas::from_grid(target_texture_handle, Vec2::new(64.0, 64.0), 4, 1);
     let target_atlas_handle = texture_atlases.add(target_texture_atlas);
 
-    handles.crosshairs = Some(crosshair_atlas_handle);
-    handles.targets = Some(target_atlas_handle);
+    atlas_handles.crosshairs = Some(crosshair_atlas_handle);
+    atlas_handles.targets = Some(target_atlas_handle);
+
+    audio_handles.yellow = Some(asset_server.load("sounds/notes/yellow.ogg"));
+    audio_handles.red = Some(asset_server.load("sounds/notes/red.ogg"));
+    audio_handles.blue = Some(asset_server.load("sounds/notes/blue.ogg"));
+    audio_handles.green = Some(asset_server.load("sounds/notes/green.ogg"));
 }
 
 /// Spawn the start menu ui
@@ -340,14 +356,14 @@ fn spawn_targets(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>
 
 fn update_targets(
     mut commands: Commands,
-    mut targets: Query<(Entity, &mut Transform), With<Target>>,
+    mut targets: Query<(Entity, &mut Transform, &Column), With<Target>>,
     time: Res<Time>,
     mut miss_event_writer: EventWriter<TargetMissEvent>,
 ) {
-    for (target, mut transform) in targets.iter_mut() {
+    for (target, mut transform, column) in targets.iter_mut() {
         if transform.translation.y < -350.0 {
             commands.entity(target).despawn();
-            miss_event_writer.send(TargetMissEvent);
+            miss_event_writer.send(TargetMissEvent(*column));
         } else {
             transform.translation.y -= 200.0 * time.delta_seconds();
         }
@@ -366,9 +382,9 @@ fn shoot_targets(
             .filter(|(_, transform, column)| {
                 *column == &Column::Yellow && transform.translation.y <= -280.0
             })
-            .for_each(|(target, _, _)| {
+            .for_each(|(target, _, column)| {
                 commands.entity(target).despawn();
-                hit_event_writer.send(TargetHitEvent);
+                hit_event_writer.send(TargetHitEvent(*column));
             });
     }
 
@@ -378,9 +394,9 @@ fn shoot_targets(
             .filter(|(_, transform, column)| {
                 *column == &Column::Red && transform.translation.y <= -280.0
             })
-            .for_each(|(target, _, _)| {
+            .for_each(|(target, _, column)| {
                 commands.entity(target).despawn();
-                hit_event_writer.send(TargetHitEvent);
+                hit_event_writer.send(TargetHitEvent(*column));
             });
     }
 
@@ -390,9 +406,9 @@ fn shoot_targets(
             .filter(|(_, transform, column)| {
                 *column == &Column::Blue && transform.translation.y <= -280.0
             })
-            .for_each(|(target, _, _)| {
+            .for_each(|(target, _, column)| {
                 commands.entity(target).despawn();
-                hit_event_writer.send(TargetHitEvent);
+                hit_event_writer.send(TargetHitEvent(*column));
             });
     }
 
@@ -402,11 +418,24 @@ fn shoot_targets(
             .filter(|(_, transform, column)| {
                 *column == &Column::Green && transform.translation.y <= -280.0
             })
-            .for_each(|(target, _, _)| {
+            .for_each(|(target, _, column)| {
                 commands.entity(target).despawn();
-                hit_event_writer.send(TargetHitEvent);
+                hit_event_writer.send(TargetHitEvent(*column));
             });
     }
 
     //FIXME: Holy code duplication, Batman!
+}
+
+fn play_hit_sound(mut hit_event_reader: EventReader<TargetHitEvent>, audio: Res<Audio>, audio_handles: Res<NoteAudioHandles>) {
+    for TargetHitEvent(column) in hit_event_reader.iter() {
+        if let Some(audio_handle) = match column {
+            Column::Yellow => &audio_handles.yellow,
+            Column::Red => &audio_handles.red,
+            Column::Blue => &audio_handles.blue,
+            Column::Green => &audio_handles.green,
+        } {
+            audio.play(audio_handle.clone());
+        };
+    }
 }
