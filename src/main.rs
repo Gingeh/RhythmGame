@@ -128,7 +128,7 @@ fn main() {
         .add_stage_before(
             CoreStage::Update,
             "SpawnTargets",
-            FixedTimestepStage::new(Duration::from_millis(250)).with_stage(SystemStage::single(
+            FixedTimestepStage::new(Duration::from_millis(350)).with_stage(SystemStage::single(
                 spawn_targets.run_in_state(GameState::Playing),
             )),
         )
@@ -349,7 +349,7 @@ fn update_targets(
             commands.entity(target).despawn();
             miss_event_writer.send(TargetMissEvent);
         } else {
-            transform.translation.y -= 200.0 * time.delta_seconds();
+            transform.translation.y -= 150.0 * time.delta_seconds();
         }
     }
 }
