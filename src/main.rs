@@ -52,7 +52,7 @@ enum Column {
 }
 
 impl Column {
-    fn index(&self) -> usize {
+    const fn index(self) -> u8 {
         match self {
             Column::Yellow => 0,
             Column::Red => 1,
@@ -319,7 +319,7 @@ fn button_visual_interact(
 
 /// Starts the game
 fn on_start_button(mut commands: Commands) {
-    commands.insert_resource(NextState(GameState::Playing))
+    commands.insert_resource(NextState(GameState::Playing));
 }
 
 /// Exits the game
@@ -338,10 +338,10 @@ fn setup_game(
     for column in [Column::Yellow, Column::Red, Column::Blue, Column::Green] {
         commands
             .spawn_bundle(SpriteSheetBundle {
-                transform: Transform::from_xyz((column.index() as f32) * 90.0 - 135.0, -305.0, 0.0)
+                transform: Transform::from_xyz(f32::from(column.index()) * 90.0 - 135.0, -305.0, 0.0)
                     .with_scale(Vec3::splat(0.3)),
                 sprite: TextureAtlasSprite {
-                    index: column.index(),
+                    index: column.index() as usize,
                     custom_size: Some(Vec2::splat(200.0)),
                     ..Default::default()
                 },
@@ -367,7 +367,7 @@ fn setup_game(
                 },
                 TextSection {
                     value: "0".into(),
-                    style: score_textstyle.clone(),
+                    style: score_textstyle,
                 },
             ]),
             transform: Transform::from_xyz(-200.0, 300.0, 0.0),
@@ -380,7 +380,7 @@ fn setup_game(
 /// Exit to the start menu if the player pressed escape
 fn menu_on_esc(mut commands: Commands, input: Res<Input<KeyCode>>) {
     if input.just_pressed(KeyCode::Escape) {
-        commands.insert_resource(NextState(GameState::StartMenu))
+        commands.insert_resource(NextState(GameState::StartMenu));
     }
 }
 
@@ -392,10 +392,10 @@ fn spawn_targets(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>
 
     commands
         .spawn_bundle(SpriteSheetBundle {
-            transform: Transform::from_xyz((column.index() as f32) * 90.0 - 135.0, 400.0, 0.0)
+            transform: Transform::from_xyz(f32::from(column.index()) * 90.0 - 135.0, 400.0, 0.0)
                 .with_scale(Vec3::splat(0.3)),
             sprite: TextureAtlasSprite {
-                index: column.index(),
+                index: column.index() as usize,
                 custom_size: Some(Vec2::splat(200.0)),
                 ..Default::default()
             },
@@ -510,7 +510,7 @@ fn update_scoreboard(
 ) {
     if score.is_changed() {
         for mut score_text in score_text_query.iter_mut() {
-            score_text.sections[1].value = score.score.to_string()
+            score_text.sections[1].value = score.score.to_string();
         }
     }
 }
