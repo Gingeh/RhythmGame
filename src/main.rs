@@ -95,13 +95,15 @@ struct Scoreboard {
 
 impl Scoreboard {
     fn hit(&mut self) {
-        self.combo += 1;
+        if self.combo < 5 {
+            self.combo += 1;
+        }
         self.score += self.combo;
     }
 
     fn miss(&mut self) {
         self.combo = 0;
-        self.score -= 1;
+        self.score -= self.combo + 1;
     }
 }
 
