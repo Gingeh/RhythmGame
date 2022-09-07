@@ -326,7 +326,11 @@ fn on_exit_button(mut exit_writer: EventWriter<AppExit>) {
 }
 
 /// Sets up the game
-fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>, asset_server: Res<AssetServer>) {
+fn setup_game(
+    mut commands: Commands,
+    atlas_handles: Res<TextureAtlasHandles>,
+    asset_server: Res<AssetServer>,
+) {
     let atlas_handle = atlas_handles.crosshairs.as_ref().unwrap();
 
     for column in [Column::Yellow, Column::Red, Column::Blue, Column::Green] {
