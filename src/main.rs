@@ -40,6 +40,9 @@ struct OldInteraction(Interaction);
 #[derive(Component)]
 struct Target;
 
+#[derive(Component)]
+struct ScoreDisplay;
+
 #[derive(Component, PartialEq, Eq, Clone, Copy)]
 enum Column {
     Yellow,
@@ -82,6 +85,24 @@ struct NoteAudioHandles {
     red: Option<Handle<AudioSource>>,
     blue: Option<Handle<AudioSource>>,
     green: Option<Handle<AudioSource>>,
+}
+
+#[derive(Default)]
+struct Scoreboard {
+    pub score: i32,
+    pub combo: i32,
+}
+
+impl Scoreboard {
+    fn hit(&mut self) {
+        self.combo += 1;
+        self.score += self.combo;
+    }
+
+    fn miss(&mut self) {
+        self.combo = 0;
+        self.score -= 1;
+    }
 }
 
 struct TargetHitEvent(Column);
@@ -132,6 +153,7 @@ fn main() {
                 .with_system(update_targets)
                 .with_system(shoot_targets)
                 .with_system(play_hit_sound)
+                .with_system(update_scoreboard)
                 .into(),
         )
         .add_stage_before(
@@ -147,6 +169,7 @@ fn main() {
         .add_startup_system(setup_camera)
         .init_resource::<TextureAtlasHandles>()
         .init_resource::<NoteAudioHandles>()
+        .init_resource::<Scoreboard>()
         .add_startup_system(load_assets)
         .run();
 }
@@ -303,7 +326,7 @@ fn on_exit_button(mut exit_writer: EventWriter<AppExit>) {
 }
 
 /// Sets up the game
-fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
+fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>, asset_server: Res<AssetServer>) {
     let atlas_handle = atlas_handles.crosshairs.as_ref().unwrap();
 
     for column in [Column::Yellow, Column::Red, Column::Blue, Column::Green] {
@@ -322,6 +345,30 @@ fn setup_game(mut commands: Commands, atlas_handles: Res<TextureAtlasHandles>) {
             .insert(Game)
             .insert(column);
     }
+
+    let score_textstyle = TextStyle {
+        font: asset_server.load("fonts/comic.ttf"),
+        font_size: 36.0,
+        color: Color::WHITE,
+    };
+
+    commands
+        .spawn_bundle(Text2dBundle {
+            text: Text::from_sections([
+                TextSection {
+                    value: "Score: ".into(),
+                    style: score_textstyle.clone(),
+                },
+                TextSection {
+                    value: "0".into(),
+                    style: score_textstyle.clone(),
+                },
+            ]),
+            transform: Transform::from_xyz(-200.0, 300.0, 0.0),
+            ..Default::default()
+        })
+        .insert(Game)
+        .insert(ScoreDisplay);
 }
 
 /// Exit to the start menu if the player pressed escape
@@ -359,11 +406,13 @@ fn update_targets(
     mut targets: Query<(Entity, &mut Transform, &Column), With<Target>>,
     time: Res<Time>,
     mut miss_event_writer: EventWriter<TargetMissEvent>,
+    mut score: ResMut<Scoreboard>,
 ) {
     for (target, mut transform, column) in targets.iter_mut() {
         if transform.translation.y < -350.0 {
             commands.entity(target).despawn();
             miss_event_writer.send(TargetMissEvent(*column));
+            score.miss();
         } else {
             transform.translation.y -= 150.0 * time.delta_seconds();
         }
@@ -375,6 +424,7 @@ fn shoot_targets(
     targets: Query<(Entity, &Transform, &Column), With<Target>>,
     input: Res<Input<KeyCode>>,
     mut hit_event_writer: EventWriter<TargetHitEvent>,
+    mut score: ResMut<Scoreboard>,
 ) {
     if input.any_just_pressed([KeyCode::A, KeyCode::H]) {
         targets
@@ -385,6 +435,7 @@ fn shoot_targets(
             .for_each(|(target, _, column)| {
                 commands.entity(target).despawn();
                 hit_event_writer.send(TargetHitEvent(*column));
+                score.hit();
             });
     }
 
@@ -397,6 +448,7 @@ fn shoot_targets(
             .for_each(|(target, _, column)| {
                 commands.entity(target).despawn();
                 hit_event_writer.send(TargetHitEvent(*column));
+                score.hit();
             });
     }
 
@@ -409,6 +461,7 @@ fn shoot_targets(
             .for_each(|(target, _, column)| {
                 commands.entity(target).despawn();
                 hit_event_writer.send(TargetHitEvent(*column));
+                score.hit();
             });
     }
 
@@ -421,13 +474,18 @@ fn shoot_targets(
             .for_each(|(target, _, column)| {
                 commands.entity(target).despawn();
                 hit_event_writer.send(TargetHitEvent(*column));
+                score.hit();
             });
     }
 
     //FIXME: Holy code duplication, Batman!
 }
 
-fn play_hit_sound(mut hit_event_reader: EventReader<TargetHitEvent>, audio: Res<Audio>, audio_handles: Res<NoteAudioHandles>) {
+fn play_hit_sound(
+    mut hit_event_reader: EventReader<TargetHitEvent>,
+    audio: Res<Audio>,
+    audio_handles: Res<NoteAudioHandles>,
+) {
     for TargetHitEvent(column) in hit_event_reader.iter() {
         if let Some(audio_handle) = match column {
             Column::Yellow => &audio_handles.yellow,
@@ -437,5 +495,16 @@ fn play_hit_sound(mut hit_event_reader: EventReader<TargetHitEvent>, audio: Res<
         } {
             audio.play(audio_handle.clone());
         };
+    }
+}
+
+fn update_scoreboard(
+    score: Res<Scoreboard>,
+    mut score_text_query: Query<&mut Text, With<ScoreDisplay>>,
+) {
+    if score.is_changed() {
+        for mut score_text in score_text_query.iter_mut() {
+            score_text.sections[1].value = score.score.to_string()
+        }
     }
 }
