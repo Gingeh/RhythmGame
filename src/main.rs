@@ -73,6 +73,12 @@ impl Distribution<Column> for Standard {
 }
 
 #[derive(Default)]
+struct MenuAssetHandles {
+    logo: Option<Handle<Image>>,
+    font: Option<Handle<Font>>,
+}
+
+#[derive(Default)]
 struct TextureAtlasHandles {
     crosshairs: Option<Handle<TextureAtlas>>,
     targets: Option<Handle<TextureAtlas>>,
@@ -168,6 +174,7 @@ fn main() {
         .add_exit_system(GameState::Playing, despawn_with::<Game>)
         // Spawn the camera (for the game and for the UI)
         .add_startup_system(setup_camera)
+        .init_resource::<MenuAssetHandles>()
         .init_resource::<TextureAtlasHandles>()
         .init_resource::<NoteAudioHandles>()
         .init_resource::<Scoreboard>()
@@ -189,10 +196,14 @@ fn setup_camera(mut commands: Commands) {
 
 fn load_assets(
     asset_server: Res<AssetServer>,
+    mut menu_asset_handles: ResMut<MenuAssetHandles>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut atlas_handles: ResMut<TextureAtlasHandles>,
     mut audio_handles: ResMut<NoteAudioHandles>,
 ) {
+    menu_asset_handles.logo = Some(asset_server.load("textures/logo.png"));
+    menu_asset_handles.font = Some(asset_server.load("fonts/comic.ttf"));
+
     let crosshair_texture_handle = asset_server.load("textures/crosshairs.png");
     let crosshair_texture_atlas =
         TextureAtlas::from_grid(crosshair_texture_handle, Vec2::new(64.0, 64.0), 4, 1);
@@ -213,72 +224,84 @@ fn load_assets(
 }
 
 /// Spawn the start menu ui
-fn setup_start_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let button_style = Style {
-        justify_content: JustifyContent::Center,
-        align_items: AlignItems::Center,
-        padding: UiRect::all(Val::Px(8.0)),
-        margin: UiRect::all(Val::Px(4.0)),
-        flex_grow: 1.0,
-        ..Default::default()
-    };
+fn setup_start_menu(mut commands: Commands, asset_handles: Res<MenuAssetHandles>) {
 
-    let button_textstyle = TextStyle {
-        font: asset_server.load("fonts/comic.ttf"),
-        font_size: 36.0,
-        color: Color::BLACK,
-    };
+    if let MenuAssetHandles {logo: Some(logo), font: Some(font)} = &*asset_handles {
+        let button_style = Style {
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            padding: UiRect::all(Val::Px(8.0)),
+            margin: UiRect::all(Val::Px(4.0)),
+            flex_grow: 1.0,
+            ..Default::default()
+        };
 
-    let menu = commands
-        .spawn_bundle(NodeBundle {
-            color: UiColor(Color::rgb(0.5, 0.5, 0.5)),
+        let button_textstyle = TextStyle {
+            font: font.clone(),
+            font_size: 36.0,
+            color: Color::BLACK,
+        };
+
+        let menu = commands
+            .spawn_bundle(NodeBundle {
+                color: UiColor(Color::rgb(0.5, 0.5, 0.5)),
+                style: Style {
+                    size: Size::new(Val::Auto, Val::Auto),
+                    margin: UiRect::all(Val::Auto),
+                    align_self: AlignSelf::Center,
+                    flex_direction: FlexDirection::ColumnReverse,
+                    //align_items: AlignItems::Stretch,
+                    justify_content: JustifyContent::Center,
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(StartMenu)
+            .id();
+
+        let logo = commands.spawn_bundle(ImageBundle {
+            image: logo.clone().into(),
             style: Style {
-                size: Size::new(Val::Auto, Val::Auto),
-                margin: UiRect::all(Val::Auto),
-                align_self: AlignSelf::Center,
-                flex_direction: FlexDirection::ColumnReverse,
-                //align_items: AlignItems::Stretch,
-                justify_content: JustifyContent::Center,
+                size: Size::new(Val::Px(300.0), Val::Px(300.0)),
                 ..Default::default()
             },
             ..Default::default()
-        })
-        .insert(StartMenu)
-        .id();
+        }).id();
 
-    let start_button = commands
-        .spawn_bundle(ButtonBundle {
-            style: button_style.clone(),
-            ..Default::default()
-        })
-        .with_children(|btn| {
-            btn.spawn_bundle(TextBundle {
-                text: Text::from_section("Start Game", button_textstyle.clone()),
+        let start_button = commands
+            .spawn_bundle(ButtonBundle {
+                style: button_style.clone(),
                 ..Default::default()
-            });
-        })
-        .insert(StartButton)
-        .insert(OldInteraction(Interaction::None))
-        .id();
+            })
+            .with_children(|btn| {
+                btn.spawn_bundle(TextBundle {
+                    text: Text::from_section("Start Game", button_textstyle.clone()),
+                    ..Default::default()
+                });
+            })
+            .insert(StartButton)
+            .insert(OldInteraction(Interaction::None))
+            .id();
 
-    let exit_button = commands
-        .spawn_bundle(ButtonBundle {
-            style: button_style,
-            ..Default::default()
-        })
-        .with_children(|btn| {
-            btn.spawn_bundle(TextBundle {
-                text: Text::from_section("Exit Game", button_textstyle.clone()),
+        let exit_button = commands
+            .spawn_bundle(ButtonBundle {
+                style: button_style,
                 ..Default::default()
-            });
-        })
-        .insert(ExitButton)
-        .insert(OldInteraction(Interaction::None))
-        .id();
+            })
+            .with_children(|btn| {
+                btn.spawn_bundle(TextBundle {
+                    text: Text::from_section("Exit Game", button_textstyle.clone()),
+                    ..Default::default()
+                });
+            })
+            .insert(ExitButton)
+            .insert(OldInteraction(Interaction::None))
+            .id();
 
-    commands
-        .entity(menu)
-        .push_children(&[start_button, exit_button]);
+        commands
+            .entity(menu)
+            .push_children(&[logo, start_button, exit_button]);
+    }
 }
 
 /// Returns true if any buttons with the given component are being pressed
