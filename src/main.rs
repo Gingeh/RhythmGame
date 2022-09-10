@@ -225,8 +225,11 @@ fn load_assets(
 
 /// Spawn the start menu ui
 fn setup_start_menu(mut commands: Commands, asset_handles: Res<MenuAssetHandles>) {
-
-    if let MenuAssetHandles {logo: Some(logo), font: Some(font)} = &*asset_handles {
+    if let MenuAssetHandles {
+        logo: Some(logo),
+        font: Some(font),
+    } = &*asset_handles
+    {
         let button_style = Style {
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
@@ -250,7 +253,6 @@ fn setup_start_menu(mut commands: Commands, asset_handles: Res<MenuAssetHandles>
                     margin: UiRect::all(Val::Auto),
                     align_self: AlignSelf::Center,
                     flex_direction: FlexDirection::ColumnReverse,
-                    //align_items: AlignItems::Stretch,
                     justify_content: JustifyContent::Center,
                     ..Default::default()
                 },
@@ -259,14 +261,16 @@ fn setup_start_menu(mut commands: Commands, asset_handles: Res<MenuAssetHandles>
             .insert(StartMenu)
             .id();
 
-        let logo = commands.spawn_bundle(ImageBundle {
-            image: logo.clone().into(),
-            style: Style {
-                size: Size::new(Val::Px(300.0), Val::Px(300.0)),
+        let logo = commands
+            .spawn_bundle(ImageBundle {
+                image: logo.clone().into(),
+                style: Style {
+                    size: Size::new(Val::Px(300.0), Val::Px(300.0)),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        }).id();
+            })
+            .id();
 
         let start_button = commands
             .spawn_bundle(ButtonBundle {
@@ -360,8 +364,12 @@ fn setup_game(
     for column in [Column::Yellow, Column::Red, Column::Blue, Column::Green] {
         commands
             .spawn_bundle(SpriteSheetBundle {
-                transform: Transform::from_xyz(f32::from(column.index()) * 90.0 - 135.0, -305.0, 0.0)
-                    .with_scale(Vec3::splat(0.3)),
+                transform: Transform::from_xyz(
+                    f32::from(column.index()) * 90.0 - 135.0,
+                    -305.0,
+                    0.0,
+                )
+                .with_scale(Vec3::splat(0.3)),
                 sprite: TextureAtlasSprite {
                     index: column.index() as usize,
                     custom_size: Some(Vec2::splat(200.0)),
