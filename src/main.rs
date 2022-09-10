@@ -14,7 +14,6 @@ use rand::{
 enum GameState {
     StartMenu,
     Playing,
-    GameOverMenu,
 }
 
 /// Marker component for entities used in the start menu
